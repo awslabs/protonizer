@@ -1,0 +1,7 @@
+app
+*.swp
+*.test
+*.out
+out
+test
+dist
