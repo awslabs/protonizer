@@ -1,6 +1,16 @@
 # protonizer
 
-A CLI tool for working with IaC in AWS Proton.
+A CLI tool for working with IaC in [AWS Proton](https://aws.amazon.com/proton/).
+
+Protonizer allows you take your existing IaC (infrastructure as code) templates and modules and bring them into [AWS Proton](https://aws.amazon.com/proton/) to scale them out across your organization. Proton provides a self-service deployment interface with versioning and traceability for your templates.
+
+Note that this is an experimental project and currently only supports generating Proton templates based on [Terraform](https://www.terraform.io/) and [CodeBuild provisioning](https://docs.aws.amazon.com/proton/latest/userguide/ag-works-prov-methods.html).
+
+
+## How it works
+
+Protonizer parses your existing Terraform modules and generates Proton [templates](https://docs.aws.amazon.com/proton/latest/userguide/ag-template-authoring.html) with [schemas](https://docs.aws.amazon.com/proton/latest/userguide/ag-schema.html) based on your input and output variables.  It also outputs [manifest.yml](https://docs.aws.amazon.com/proton/latest/userguide/ag-wrap-up.html) files that will run `terraform apply` within a Proton-managed environment.
+
 
 ## Usage
 
@@ -100,7 +110,3 @@ https://us-east-1.console.aws.amazon.com/proton/home?region=us-east-1#/templates
 ```
 
 Note that this can also be done inline with the `protonize --publish` command.
-
-## Notes
-
-This is an experimental project and currently only supports generating Proton templates based on Terraform and CodeBuild provisioning.
