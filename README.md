@@ -7,6 +7,11 @@ Protonizer allows you take your existing IaC (infrastructure as code) templates 
 Note that this is an experimental project and currently only supports generating Proton templates based on [Terraform](https://www.terraform.io/) and [CodeBuild provisioning](https://docs.aws.amazon.com/proton/latest/userguide/ag-works-prov-methods.html).  The tool also currently only supports primitive [HCL data types](https://developer.hashicorp.com/terraform/language/expressions/types#types) such as `strings`, `numbers`, `bools`, and `lists` of primitive types. This is currently aligned with the Proton schema types that are supported by the Proton console.
 
 
+## Install
+
+To install the `protonizer` CLI tool, you can download the latest [release](https://github.com/awslabs/protonizer/releases) for your platform and architecture.
+
+
 ## How it works
 
 Protonizer parses your existing Terraform modules and generates Proton [templates](https://docs.aws.amazon.com/proton/latest/userguide/ag-template-authoring.html) with [schemas](https://docs.aws.amazon.com/proton/latest/userguide/ag-schema.html) based on your input and output variables.  It also outputs [manifest.yml](https://docs.aws.amazon.com/proton/latest/userguide/ag-wrap-up.html) files that will run `terraform apply` within a Proton-managed environment.
