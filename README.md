@@ -110,3 +110,27 @@ https://us-east-1.console.aws.amazon.com/proton/home?region=us-east-1#/templates
 ```
 
 Note that this can also be done inline with the `protonize --publish` command.
+
+
+### Development
+
+#### Setup
+
+- Go 1.19
+- Install [pre-commit](https://pre-commit.com/)
+- Run `pre-commit install` to setup git hooks
+
+#### Commands
+
+```
+ Choose a make command to run
+
+  vet           vet code
+  test          run unit tests
+  build         build a binary
+  autobuild     auto build when source files change
+  dockerbuild   build project into a docker container image
+  start         build and run local project
+  deploy        build code into a container and deploy it to the cloud dev environment
+  xplat         multiplatform build
+```

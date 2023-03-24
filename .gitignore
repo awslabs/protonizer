@@ -3,5 +3,4 @@ app
 *.test
 *.out
 out
-test
 dist
