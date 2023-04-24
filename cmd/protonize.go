@@ -364,8 +364,16 @@ func parseTerraformSource(name, srcDir string) ([]schemaVariable, outputData) {
 			sv.Default = nil
 		}
 
-		//unsupported types (for now)
-		if strings.HasPrefix(sv.Type, "object(") || strings.HasPrefix(sv.Type, "map(") {
+		//output warning for unsupported types
+		if strings.HasPrefix(sv.Type, "object(") ||
+			strings.HasPrefix(sv.Type, "any") ||
+			strings.HasPrefix(sv.Type, "map(") ||
+			strings.HasPrefix(sv.Type, "set(") {
+
+			fmt.Println("WARNING: skipping unsupported input variable:")
+			fmt.Println(v.Name)
+			fmt.Println(v.Type)
+			fmt.Println()
 			continue
 		}
 
