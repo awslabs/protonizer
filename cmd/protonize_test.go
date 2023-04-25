@@ -3,8 +3,10 @@ package cmd
 import (
 	"errors"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/hack-pad/hackpadfs"
@@ -16,11 +18,91 @@ func TestGenerateEnvironmentTemplate(t *testing.T) {
 	internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 }
 
+// tests that reserved variables are mapped properly
+func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
+
+	result := internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
+
+	f, err := result.Open("my_template/infrastructure/main.tf")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Error(err)
+	}
+	contents := string(b)
+	t.Log(contents)
+	if strings.Contains(contents, "name = var.environment.inputs.name") {
+		t.Error("name variable should not be mapped to environment.inputs")
+	}
+
+	f, err = result.Open("my_template/schema/schema.yaml")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	b, err = ioutil.ReadAll(f)
+	if err != nil {
+		t.Error(err)
+	}
+	contents = string(b)
+	t.Log(contents)
+	lines := strings.Split(contents, "\n")
+	if SliceContains(&lines, "title: name", true) {
+		t.Error("schema should not contain variable `name`")
+	}
+}
+
+// tests that reserved variables are mapped properly
+func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
+
+	result := internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
+
+	f, err := result.Open("my_template/instance_infrastructure/main.tf")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	b, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Error(err)
+	}
+	contents := string(b)
+	t.Log(contents)
+	if strings.Contains(contents, "name = var.service_instance.inputs.name") {
+		t.Error("name variable should not be mapped to service_instance.inputs")
+	}
+	if strings.Contains(contents, "environment = var.service_instance.inputs.environment") {
+		t.Error("environment variable should not be mapped to service_instance.inputs")
+	}
+
+	f, err = result.Open("my_template/schema/schema.yaml")
+	if err != nil {
+		t.Error(err)
+	}
+	defer f.Close()
+	b, err = ioutil.ReadAll(f)
+	if err != nil {
+		t.Error(err)
+	}
+	contents = string(b)
+	t.Log(contents)
+	lines := strings.Split(contents, "\n")
+	if SliceContains(&lines, "title: name", true) {
+		t.Error("schema should not contain variable `name`")
+	}
+	if SliceContains(&lines, "title: environment", true) {
+		t.Error("schema should not contain variable `environment`")
+	}
+}
+
 func TestGenerateServiceTemplate(t *testing.T) {
 	internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 }
 
-func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType, infraDir, infraSrcDir string) {
+func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType, infraDir, infraSrcDir string) hackpadfs.FS {
 	verbose = true
 
 	//create in memory file system for testing
@@ -97,7 +179,7 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 			return err
 		}
 		t.Log("looking for path in destFS", path)
-		if SliceContains(&pathsToCheck, path) {
+		if SliceContains(&pathsToCheck, path, false) {
 			findings++
 			t.Log("found", path)
 		}
@@ -112,4 +194,6 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 	if findings != len(pathsToCheck) {
 		t.Error(errors.New("path counts don't match. did you add/remove something in the local templates directory?"))
 	}
+
+	return destFS
 }

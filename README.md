@@ -117,6 +117,28 @@ https://us-east-1.console.aws.amazon.com/proton/home?region=us-east-1#/templates
 Note that this can also be done inline with the `protonize --publish` command.
 
 
+### Terraform variable mapping
+
+To avoid conflicts, if you have variables in your source templates with reserved names in Proton (i.e., `name` and `environment`), they will be removed as template input variables and instead be sourced from proton metadata.
+
+
+#### Environment templates
+
+If the source terraform module has an input variable named `name`, it will be supplied by the name of the proton environment rather than by template specific input.
+
+
+#### Service templates
+
+If the source terraform module has a variable named `name`, it will be set to the name of the service and the service instance with a `-` (dash) in between.  If the source terraform module has a variable named `environment`, it will be set to the service instance's environment name.
+
+For example, when creating a service named `sales-api` and a service instance named `dev` associated with a proton environment named `dev`, the Terraform module will get passed the following values:
+
+```hcl
+name = "sales-api-dev"
+environment = "dev"
+```
+
+
 ### Development
 
 #### Setup
