@@ -3,6 +3,11 @@ variable "name" {
   type        = string
 }
 
+variable "environment" {
+  description = "Another environment name"
+  type        = string
+}
+
 variable "vpc_cidr" {
   description = "The CIDR range for the VPC"
   type        = string

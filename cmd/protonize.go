@@ -221,9 +221,6 @@ func generateTemplate(in generateInput) error {
 	debug("name =", in.name)
 	debug("srcDir =", in.srcDir)
 
-	//parse input/output variables
-	vars, outputs := parseTerraformSource(in.name, in.srcDir)
-
 	schemaSrc := ""
 	templateTerraformMain := ""
 	switch in.templateType {
@@ -236,6 +233,9 @@ func generateTemplate(in generateInput) error {
 		schemaSrc = templateSchemaSvc
 		templateTerraformMain = templateTerraformMainSvc
 	}
+
+	//parse input/output variables
+	vars, outputs := parseTerraformSource(in.name, in.srcDir)
 
 	//codegen a proton schema
 	t := template.Must(template.New("schema").Parse(schemaSrc))
@@ -333,9 +333,12 @@ func parseTerraformSource(name, srcDir string) ([]schemaVariable, outputData) {
 	debugFmt("found %v variables", len(module.Variables))
 	debug("\n")
 
+	//sort variables by name
+	inputVars := sortTFVariables(module)
+
 	//map tf variables to openapi properties
 	vars := []schemaVariable{}
-	for _, v := range module.Variables {
+	for _, v := range inputVars {
 		debugFmt("%v (type: %v; default: %v) \n", v.Name, v.Type, v.Default)
 
 		sv := schemaVariable{
@@ -380,20 +383,19 @@ func parseTerraformSource(name, srcDir string) ([]schemaVariable, outputData) {
 		vars = append(vars, sv)
 	}
 
-	//extract tf output
-	outputs := outputData{
-		ModuleName: name,
-		Outputs:    []tfconfig.Output{},
+	//debug
+	if verbose {
+		debug("\n")
+		debugFmt("found %v outputs", len(module.Outputs))
+		debug("\n")
+		for _, o := range module.Outputs {
+			debugFmt("%v (description: %v) \n", o.Name, o.Description)
+		}
 	}
 
-	debug("\n")
-	debugFmt("found %v outputs", len(module.Outputs))
-	debug("\n")
-
-	for _, o := range module.Outputs {
-		debugFmt("%v (description: %v) \n", o.Name, o.Description)
-		outputs.Outputs = append(outputs.Outputs, *o)
-	}
+	//return output
+	outputs := outputData{ModuleName: name}
+	outputs.Outputs = sortTFOutputs(module)
 
 	return vars, outputs
 }

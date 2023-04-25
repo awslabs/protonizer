@@ -7,7 +7,7 @@ schema:
       type: object
       description: Service input properties
       properties:
-      {{ range $v := . }}
+      {{ range $v := . }}{{ if and (ne $v.Name "name") (ne $v.Name "environment") }}
         {{ $v.Name }}:
           title: {{ $v.Name }}
           type: {{ $v.Type }}
@@ -16,4 +16,4 @@ schema:
           {{ end }}
           description: "{{ $v.Description }}"
           {{ if ne nil $v.Default }}default: {{ $v.Default }}{{ end }}
-      {{ end }}
+      {{ end }}{{ end }}

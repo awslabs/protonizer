@@ -7,14 +7,14 @@ infrastructure:
           golang: 1.18 # not needed, but required by proton (for now)
         env:
           variables:
-            TF_VERSION: 1.3.9
+            TF_VERSION: 1.4.5
             AWS_REGION: us-east-1
             TF_STATE_BUCKET: {{ .TerraformS3StateBucket }}
 
         provision:
 
           # get proton metadata from input file
-          - export IN=$(cat proton-inputs.json)
+          - export IN=$(cat proton-inputs.json) && echo ${IN}
           - export PROTON_ENV=$(echo $IN | jq '.environment.name' -r)
 {{ if eq .TemplateType "service" }}
           - export PROTON_SVC=$(echo $IN | jq '.service.name' -r)
@@ -42,7 +42,7 @@ infrastructure:
         deprovision:
 
            # get proton metadata from input file
-          - export IN=$(cat proton-inputs.json)
+          - export IN=$(cat proton-inputs.json) && echo ${IN}
           - export PROTON_ENV=$(echo $IN | jq '.environment.name' -r)
 {{ if eq .TemplateType "service" }}
           - export PROTON_SVC=$(echo $IN | jq '.service.name' -r)
