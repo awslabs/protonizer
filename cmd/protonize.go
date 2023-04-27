@@ -341,11 +341,14 @@ func parseTerraformSource(name, srcDir string) ([]schemaVariable, outputData) {
 	for _, v := range inputVars {
 		debugFmt("%v (type: %v; default: %v) \n", v.Name, v.Type, v.Default)
 
+		//escape quotes in descriptions
+		desc := strings.Replace(v.Description, `"`, `\"`, -1)
+
 		sv := schemaVariable{
 			Name:        v.Name,
 			Title:       v.Name,
 			Type:        v.Type,
-			Description: v.Description,
+			Description: desc,
 			Default:     v.Default,
 			Required:    v.Required,
 		}
