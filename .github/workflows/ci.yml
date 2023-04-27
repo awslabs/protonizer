@@ -22,7 +22,7 @@ jobs:
           python -m pip install pre-commit
           make precommit
 
-      - name: Unit Test
+      - name: Test
         run: make test
 
       - name: Build
