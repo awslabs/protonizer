@@ -1,10 +1,10 @@
 variable "name" {
-  description = "The name of this environment"
+  description = "This should be mapped to proton metadata"
   type        = string
 }
 
 variable "environment" {
-  description = "Another environment name"
+  description = "This should be mapped to proton metadata for services"
   type        = string
 }
 
@@ -36,4 +36,9 @@ variable "public_subnet_two_cidr" {
   description = "The CIDR range for public subnet two"
   type        = string
   default     = "10.0.64.0/18"
+}
+
+variable "quote_test" {
+  description = "this variable is used to test \"quotes\" in descriptions"
+  type        = string
 }

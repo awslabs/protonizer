@@ -12,6 +12,7 @@ import (
 	"github.com/hack-pad/hackpadfs"
 	"github.com/hack-pad/hackpadfs/mem"
 	"github.com/jritsema/scaffolder"
+	"gopkg.in/yaml.v3"
 )
 
 func TestGenerateEnvironmentTemplate(t *testing.T) {
@@ -182,6 +183,21 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 		if SliceContains(&pathsToCheck, path, false) {
 			findings++
 			t.Log("found", path)
+		}
+
+		//test that any generated yaml is valid
+		if strings.HasSuffix(path, "yaml") || strings.HasSuffix(path, "yml") {
+			t.Log("testing", path)
+			contents, err := hackpadfs.ReadFile(destFS, path)
+			t.Log(string(contents))
+			if err != nil {
+				t.Error(err)
+			}
+			var data interface{}
+			err = yaml.Unmarshal(contents, &data)
+			if err != nil {
+				t.Error("invalid generated yaml", err)
+			}
 		}
 		return nil
 	})

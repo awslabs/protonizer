@@ -23,7 +23,7 @@ variable "service_instance" {
   description = "proton service instance"
   type = object({
     name   = string
-    inputs = map(string)
+    inputs = any
   })
 }
 
