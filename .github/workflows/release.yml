@@ -17,12 +17,20 @@ jobs:
             goos: windows
     steps:
       - uses: actions/checkout@v3
+
+      - name: Set APP_VERSION
+        run: echo APP_VERSION=$(basename ${GITHUB_REF}) >> ${GITHUB_ENV}
+
+      - name: Set BUILD_TIME
+        run: echo BUILD_TIME=$(date --iso-8601=seconds) >> ${GITHUB_ENV}
+
       - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
           goversion: "1.19"
+          ldflags: -X "main.version=${{ env.APP_VERSION }} built on ${{ env.BUILD_TIME }}, commit ${{ github.sha }}"
           overwrite: true
           pre_command: export CGO_ENABLED=0 && export GODEBUG=http2client=0
-          build_command: make build
+          retry: 10
