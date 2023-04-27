@@ -1,4 +1,5 @@
 PACKAGES := $(shell go list ./...)
+BUILD_VERSION := $(shell git describe --tags)
 
 all: help
 
@@ -28,7 +29,8 @@ test: vet
 ## build: build a binary
 .PHONY: build
 build: test
-	go build -o ./app -v
+	echo building ${BUILD_VERSION}
+	go build -ldflags "-X main.version=${BUILD_VERSION}" -o ./app -v
 
 ## autobuild: auto build when source files change
 .PHONY: autobuild
@@ -46,6 +48,6 @@ start: build
 ## xplat: multiplatform build
 .PHONY: xplat
 xplat: build
-	GOOS=darwin GOARCH=amd64 go build -v -o ./dist/protonizer-darwin-amd64
-	GOOS=darwin GOARCH=arm64 go build -v -o ./dist/protonizer-darwin-arm64
-	GOOS=windows GOARCH=amd64 go build -v -o ./dist/protonizer-windows-amd64
+	GOOS=darwin GOARCH=amd64 go build -v -o ./dist/protonizer-darwin-amd64 -ldflags "-X main.version=${BUILD_VERSION}"
+	GOOS=darwin GOARCH=arm64 go build -v -o ./dist/protonizer-darwin-arm64 -ldflags "-X main.version=${BUILD_VERSION}"
+	GOOS=windows GOARCH=amd64 go build -v -o ./dist/protonizer-windows-amd64 -ldflags "-X main.version=${BUILD_VERSION}"
