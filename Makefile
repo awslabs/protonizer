@@ -28,7 +28,7 @@ test: vet
 
 ## build: build a binary
 .PHONY: build
-build: test
+build:
 	echo building ${BUILD_VERSION}
 	go build -ldflags "-X main.version=${BUILD_VERSION}" -o ./app -v
 
