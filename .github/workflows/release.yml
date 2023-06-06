@@ -29,7 +29,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
-          goversion: "1.19"
+          goversion: "1.20"
           ldflags: -X "main.version=${{ env.APP_VERSION }} built on ${{ env.BUILD_TIME }}, commit ${{ github.sha }}"
           overwrite: true
           pre_command: export CGO_ENABLED=0 && export GODEBUG=http2client=0
