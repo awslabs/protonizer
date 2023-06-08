@@ -4,6 +4,7 @@ Copyright © 2022 John Ritsema
 package cmd
 
 import (
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -38,5 +39,6 @@ func Execute(version string) {
 }
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 }

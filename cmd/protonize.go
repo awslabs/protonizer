@@ -1,10 +1,9 @@
 package cmd
 
 import (
-	"bytes"
+	"embed"
 	_ "embed"
 	"fmt"
-	"log"
 	"path"
 	"strings"
 	"text/template"
@@ -44,35 +43,11 @@ var (
 	tfSvcInfraSrcDir string
 )
 
-//go:embed templates/schema.env.yamltemplate
-var templateSchemaEnv string
+//go:embed templates/*
+var templateFS embed.FS
 
-//go:embed templates/schema.svc.yamltemplate
-var templateSchemaSvc string
-
-//go:embed templates/terraform/manifest.yamltemplate
-var templateManifestTerraform string
-
-//go:embed templates/terraform/variables.env.tf
-var templateTerraformVariablesEnv string
-
-//go:embed templates/terraform/variables.svc.tf
-var templateTerraformVariablesSvc string
-
-//go:embed templates/terraform/main.env.tftemplate
-var templateTerraformMainEnv string
-
-//go:embed templates/terraform/main.svc.tftemplate
-var templateTerraformMainSvc string
-
-//go:embed templates/terraform/outputs.tftemplate
-var templateTerraformOutputs string
-
-//go:embed templates/terraform/install-terraform.sh
-var templateTerraformInstallSH string
-
-//go:embed templates/terraform/output.sh
-var templateTerraformOutputSH string
+// parsed scaffold templates
+var scaffoldTemplates *template.Template
 
 // upCmd represents the up command
 var templateProtonizeCmd = &cobra.Command{
@@ -130,7 +105,10 @@ type terraformMain struct {
 }
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
+
+	var err error
+	scaffoldTemplates, err = templateParseFSRecursive(templateFS, ".tpl", nil)
+	handleError("error parsing go templates", err)
 
 	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeName, "name", "n", "", "The name of the template")
 	templateProtonizeCmd.MarkFlagRequired("name")
@@ -182,15 +160,13 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 
 	var tType protonTemplateType
 	switch flagProtonizeTemplateType {
-
 	case string(templateTypeEnvironment):
 		tType = templateTypeEnvironment
-
 	case string(templateTypeService):
 		tType = templateTypeService
-
 	default:
-		errorExit(fmt.Sprintf("template type: %s is invalid. only %v and %v are supported", flagProtonizeTemplateType, templateTypeEnvironment, templateTypeService))
+		errorExit(fmt.Sprintf("template type: %s is invalid. only %v and %v are supported",
+			flagProtonizeTemplateType, templateTypeEnvironment, templateTypeService))
 	}
 
 	//generate proton template
@@ -203,7 +179,7 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 		terraformRemoteStateBucket: flagProtonizeTerraformRemoteStateBucket,
 		compatibleEnvironments:     flagProtonizeCompatibleEnvs,
 	}
-	err = generateTemplate(input)
+	err = generateCodeBuildTerraformTemplate(input)
 	handleError("generating template", err)
 
 	templateDir := path.Join(flagProtonizeOutDir, flagProtonizeName)
@@ -217,58 +193,25 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 }
 
 // generates a proton template and returns the outputted template directory
-func generateTemplate(in generateInput) error {
+func generateCodeBuildTerraformTemplate(in generateInput) error {
 	debug("name =", in.name)
 	debug("srcDir =", in.srcDir)
 
-	schemaSrc := ""
-	templateTerraformMain := ""
-	switch in.templateType {
-
-	case templateTypeEnvironment:
-		schemaSrc = templateSchemaEnv
-		templateTerraformMain = templateTerraformMainEnv
-
-	case templateTypeService:
-		schemaSrc = templateSchemaSvc
-		templateTerraformMain = templateTerraformMainSvc
-	}
+	//create datasets that gets fed into templates
 
 	//parse input/output variables
 	vars, outputs := parseTerraformSource(in.name, in.srcDir)
 
-	//codegen a proton schema
-	t := template.Must(template.New("schema").Parse(schemaSrc))
-	var schema bytes.Buffer
-	err := t.Execute(&schema, vars)
-	handleError("executing template", err)
+	mainData := terraformMain{
+		ModuleName: in.name,
+		Variables:  vars,
+	}
 
-	//codegen a proton manifest
-	t = template.Must(template.New("manifest").Parse(templateManifestTerraform))
-	var manifest bytes.Buffer
 	manifestData := terraformManifest{
 		TemplateName:           in.name,
 		TerraformS3StateBucket: in.terraformRemoteStateBucket,
 		TemplateType:           string(in.templateType),
 	}
-	err = t.Execute(&manifest, manifestData)
-	handleError("executing template", err)
-
-	//codegen main module
-	t = template.Must(template.New("main").Parse(templateTerraformMain))
-	var main bytes.Buffer
-	mainData := terraformMain{
-		ModuleName: in.name,
-		Variables:  vars,
-	}
-	err = t.Execute(&main, mainData)
-	handleError("executing template", err)
-
-	//codegen proton outputs
-	t = template.Must(template.New("outputs").Parse(templateTerraformOutputs))
-	var outputContent bytes.Buffer
-	err = t.Execute(&outputContent, outputs)
-	handleError("executing template", err)
 
 	//codegen proton config
 	protonData := protonConfigData{
@@ -282,24 +225,28 @@ func generateTemplate(in generateInput) error {
 	protonConfig, err := yaml.Marshal(protonData)
 	handleError("marshalling proton config yaml", err)
 
-	// output directory structure
-	infraDir := path.Join(in.name, protonInfrastructureDirEnv)
-	variablesFile := templateTerraformVariablesEnv
-	if in.templateType == templateTypeService {
+	tType := ""
+	infraDir := ""
+	switch in.templateType {
+	case templateTypeEnvironment:
+		tType = "env"
+		infraDir = path.Join(in.name, protonInfrastructureDirEnv)
+	case templateTypeService:
+		tType = "svc"
 		infraDir = path.Join(in.name, protonInfrastructureDirSvc)
-		variablesFile = templateTerraformVariablesSvc
 	}
+
 	schemaDir := path.Join(in.name, protonSchemaDir)
 
 	contents := scaffolder.FSContents{
 		path.Join(in.name, ProtonYamlFile):          protonConfig,
-		path.Join(schemaDir, "schema.yaml"):         schema.Bytes(),
-		path.Join(infraDir, "manifest.yaml"):        manifest.Bytes(),
-		path.Join(infraDir, "main.tf"):              main.Bytes(),
-		path.Join(infraDir, "variables.tf"):         []byte(variablesFile),
-		path.Join(infraDir, "outputs.tf"):           outputContent.Bytes(),
-		path.Join(infraDir, "output.sh"):            []byte(templateTerraformOutputSH),
-		path.Join(infraDir, "install-terraform.sh"): []byte(templateTerraformInstallSH),
+		path.Join(schemaDir, "schema.yaml"):         render("schema/schema.%s.yaml.go.tpl", vars, tType),
+		path.Join(infraDir, "manifest.yaml"):        render("infrastructure/codebuild/terraform/manifest.yaml.go.tpl", manifestData),
+		path.Join(infraDir, "main.tf"):              render("infrastructure/codebuild/terraform/main.%s.tf.go.tpl", mainData, tType),
+		path.Join(infraDir, "outputs.tf"):           render("infrastructure/codebuild/terraform/outputs.tf.go.tpl", outputs),
+		path.Join(infraDir, "output.sh"):            readTemplateFS("infrastructure/codebuild/terraform/output.sh"),
+		path.Join(infraDir, "variables.tf"):         readTemplateFS("infrastructure/codebuild/terraform/variables.%s.tf", tType),
+		path.Join(infraDir, "install-terraform.sh"): readTemplateFS("infrastructure/codebuild/terraform/install-terraform.sh"),
 	}
 
 	//populate the file system with the generated contents
@@ -308,7 +255,7 @@ func generateTemplate(in generateInput) error {
 		return err
 	}
 
-	//copy src filesystem to infrastructure/src
+	//copy terraform src filesystem to infrastructure/src
 	outDir := path.Join(path.Join(infraDir, protonTFSrc))
 	destFS, err := hackpadfs.Sub(in.destFS, outDir)
 	handleError("creating file system", err)

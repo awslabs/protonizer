@@ -140,7 +140,7 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 		srcFS:        srcFS,
 		destFS:       destFS,
 	}
-	err = generateTemplate(input)
+	err = generateCodeBuildTerraformTemplate(input)
 	if err != nil {
 		t.Error(err)
 	}
