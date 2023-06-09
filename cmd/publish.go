@@ -32,13 +32,9 @@ type protonConfigData struct {
 	Description string `yaml:"description"`
 
 	//optional
-	TerraformRemoteStateBucket string   `yaml:"terraformRemoteStateBucket,omitempty"`
-	CompatibleEnvironments     []string `yaml:"compatibleEnvironments,omitempty"`
+	PublishBucket          string   `yaml:"publishBucket,omitempty"`
+	CompatibleEnvironments []string `yaml:"compatibleEnvironments,omitempty"`
 }
-
-const (
-	ProtonYamlFile = "proton.yaml"
-)
 
 var templatePublishCmd = &cobra.Command{
 	Use:   "publish",
@@ -49,7 +45,7 @@ var templatePublishCmd = &cobra.Command{
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
-	templatePublishCmd.Flags().StringVarP(&flagTemplatePublishFile, "file", "f", ProtonYamlFile, "The proton yaml file to use")
+	templatePublishCmd.Flags().StringVarP(&flagTemplatePublishFile, "file", "f", "proton.yaml", "The proton yaml file to use")
 	rootCmd.AddCommand(templatePublishCmd)
 }
 
@@ -86,7 +82,7 @@ func publishTemplate(file string) {
 	ctx := context.Background()
 
 	//upload to s3
-	bucket := protonConfig.TerraformRemoteStateBucket
+	bucket := protonConfig.PublishBucket
 	key := zipFileName
 
 	s3Client := s3.NewFromConfig(cfg)
@@ -112,10 +108,10 @@ func publishTemplate(file string) {
 
 	switch protonConfig.Type {
 
-	case string(templateTypeEnvironment):
+	case "environment":
 		majorVersion, minorVersion = publishEnvironmentTemplate(cfg, protonConfig, key, ctx)
 
-	case string(templateTypeService):
+	case "service":
 		majorVersion, minorVersion = publishServiceTemplate(cfg, protonConfig, key, ctx)
 	}
 	fmt.Printf("published %s:%s.%s \n", protonConfig.Name, majorVersion, minorVersion)
@@ -133,6 +129,12 @@ func publishEnvironmentTemplate(cfg aws.Config, protonConfig *protonConfigData, 
 		Name:        &protonConfig.Name,
 		Description: &protonConfig.Description,
 		DisplayName: &protonConfig.DisplayName,
+		Tags: []types.Tag{
+			{
+				Key:   aws.String("creator"),
+				Value: aws.String("protonizer-cli"),
+			},
+		},
 	}
 	m := "proton.CreateEnvironmentTemplate()"
 	debug(m)
@@ -144,7 +146,7 @@ func publishEnvironmentTemplate(cfg aws.Config, protonConfig *protonConfigData, 
 
 	s3Source := types.TemplateVersionSourceInputMemberS3{
 		Value: types.S3ObjectSource{
-			Bucket: &protonConfig.TerraformRemoteStateBucket,
+			Bucket: &protonConfig.PublishBucket,
 			Key:    &s3Key,
 		},
 	}
@@ -238,7 +240,7 @@ func publishServiceTemplate(cfg aws.Config, protonConfig *protonConfigData, s3Ke
 
 	s3Source := types.TemplateVersionSourceInputMemberS3{
 		Value: types.S3ObjectSource{
-			Bucket: &protonConfig.TerraformRemoteStateBucket,
+			Bucket: &protonConfig.PublishBucket,
 			Key:    &s3Key,
 		},
 	}

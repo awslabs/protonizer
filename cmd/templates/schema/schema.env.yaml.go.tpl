@@ -9,7 +9,7 @@ schema:
       properties:
       {{ range $v := . }}{{ if ne $v.Name "name" }}
         {{ $v.Name }}:
-          title: {{ $v.Name }}
+          title: {{ $v.Title }}
           type: {{ $v.Type }}
           {{ if ne "" $v.ArrayType }}items:
             type: {{ $v.ArrayType }}

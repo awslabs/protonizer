@@ -2,22 +2,81 @@
 
 A CLI tool for working with IaC in [AWS Proton](https://aws.amazon.com/proton/).
 
-Protonizer allows you take your existing IaC (infrastructure as code) templates and modules and bring them into [AWS Proton](https://aws.amazon.com/proton/) to scale them out across your organization. Proton provides a self-service deployment interface with versioning and traceability for your templates.
+AWS Proton provides a self-service deployment service with versioning and traceability for your IaC templates.  The Protonizer CLI tool lets you scaffold out new Proton templates from scratch as well as allows you take your existing IaC (infrastructure as code) templates and modules and bring them into [AWS Proton](https://aws.amazon.com/proton/) to scale them out across your organization.
 
-Note that this is an experimental project and currently only supports generating Proton templates based on [Terraform](https://www.terraform.io/) and [CodeBuild provisioning](https://docs.aws.amazon.com/proton/latest/userguide/ag-works-prov-methods.html).  The tool also currently only supports primitive [HCL data types](https://developer.hashicorp.com/terraform/language/expressions/types#types) such as `strings`, `numbers`, `bools`, and `lists` of primitive types. This is currently aligned with the Proton schema types that are supported by the Proton console.
+Note that this is an experimental project and currently supports generating Proton templates based on existing [Terraform](https://www.terraform.io/) and [CodeBuild provisioning](https://docs.aws.amazon.com/proton/latest/userguide/ag-works-prov-methods.html).  The tool also currently only supports primitive [HCL data types](https://developer.hashicorp.com/terraform/language/expressions/types#types) such as `strings`, `numbers`, `bools`, and `lists` of primitive types. This is currently aligned with the Proton schema types that are supported by the Proton console.
 
 
 ## Install
 
-To install the `protonizer` CLI tool, you can download the latest [release](https://github.com/awslabs/protonizer/releases) for your platform and architecture.
+To install the `protonizer` CLI tool, you can download the latest binary [release](https://github.com/awslabs/protonizer/releases) for your platform and architecture.
 
 
 ## How it works
 
-Protonizer parses your existing Terraform modules and generates Proton [templates](https://docs.aws.amazon.com/proton/latest/userguide/ag-template-authoring.html) with [schemas](https://docs.aws.amazon.com/proton/latest/userguide/ag-schema.html) based on your input and output variables.  It also outputs [manifest.yml](https://docs.aws.amazon.com/proton/latest/userguide/ag-wrap-up.html) files that will run `terraform apply` within a Proton-managed environment.
+Protonizer can scaffold out all of the files you need to build a Proton template.  It can them register and publish the template using the `publish` command.
+
+Protonizer can also parse your existing Terraform modules and generates Proton [templates](https://docs.aws.amazon.com/proton/latest/userguide/ag-template-authoring.html) with [schemas](https://docs.aws.amazon.com/proton/latest/userguide/ag-schema.html) based on your input and output variables.  It also outputs [manifest.yml](https://docs.aws.amazon.com/proton/latest/userguide/ag-wrap-up.html) files that will run `terraform apply` within a Proton-managed environment.
 
 
 ## Usage
+
+### new
+
+The `new` command scaffolds out new Proton templates from scratch.
+
+**Terraform**
+
+```
+protonizer new \
+  --name my_template \
+  --type service \
+  --provisioning codebuild --tool terraform \
+  --terraform-remote-state-bucket my-s3-bucket \
+  --publish-bucket my-s3-bucket \
+  --out ~/proton/templates
+```
+
+```
+tree
+.
+|____v1
+| |____proton.yaml
+| |____schema
+| | |____schema.yaml
+| |____infrastructure
+| | |____outputs.tf
+| | |____main.tf
+| | |____output.sh
+| | |____manifest.yaml
+| | |____install-terraform.sh
+| | |____variables.tf
+```
+
+**CloudFormation**
+
+```
+protonizer new \
+  --name my-template \
+  --type environment \
+  --provisioning awsmanaged \
+  --out ~/proton/templates \
+  --publish-bucket my-s3-bucket
+```
+
+```
+cd my_template/v1
+tree
+.
+|____v1
+| |____proton.yaml
+| |____schema
+| | |____schema.yaml
+| |____infrastructure
+| | |____cloudformation.yaml
+| | |____manifest.yaml
+```
+
 
 ### protonize
 
@@ -29,11 +88,10 @@ The `protonize` command can generate and publish a [CodeBuild provisioning](http
 protonizer protonize \
   --name my_template \
   --type environment \
-  --tool terraform \
-  --provisioning codebuild \
+  --provisioning codebuild --tool terraform \
+  --terraform-remote-state-bucket my-s3-bucket \
   --dir ~/my-existing-tf-module \
   --out ~/proton/templates \
-  --bucket my-s3-bucket
 
 template source outputted to ~/proton/templates/my_template
 done
@@ -46,11 +104,11 @@ protonizer protonize \
   --name my_template \
   --type service \
   --compatible-env env1:1 --compatible-env env2:1 \
-  --tool terraform \
-  --provisioning codebuild \
+  --provisioning codebuild --tool terraform \
+  --terraform-remote-state-bucket my-s3-bucket \
   --dir ~/my-existing-tf-module \
   --out ~/proton/templates \
-  --bucket my-s3-bucket \
+  --publish-bucket my-s3-bucket \
   --publish
 
 template source outputted to ~/proton/templates/my_template
@@ -72,7 +130,7 @@ name: my_template
 type: environment
 displayName: My Template
 description: "This is my template"
-terraformRemoteStateBucket: tf-remote-state-bucket
+publishBucket: my-s3-bucket
 ```
 
 publish using yaml file
@@ -92,10 +150,10 @@ name: my_template
 type: service
 displayName: My Template
 description: "This is my template"
-terraformRemoteStateBucket: tf-remote-state-bucket
 compatibleEnvironments:
   - env1:3
   - env2:4
+publishBucket: my-s3-bucket
 ```
 
 publish using yaml file
@@ -143,7 +201,7 @@ environment = "dev"
 
 #### Setup
 
-- Go 1.19
+- Go 1.20
 - Install [pre-commit](https://pre-commit.com/)
 - Run `pre-commit install` to setup git hooks
 

@@ -16,13 +16,13 @@ import (
 )
 
 func TestGenerateEnvironmentTemplate(t *testing.T) {
-	internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
+	internalTestGenerateTemplate(t, "environment", protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 }
 
 // tests that reserved variables are mapped properly
 func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 
-	result := internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
+	result := internalTestGenerateTemplate(t, "environment", protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 
 	f, err := result.Open("my_template/infrastructure/main.tf")
 	if err != nil {
@@ -59,7 +59,7 @@ func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 // tests that reserved variables are mapped properly
 func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 
-	result := internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
+	result := internalTestGenerateTemplate(t, "service", protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 
 	f, err := result.Open("my_template/instance_infrastructure/main.tf")
 	if err != nil {
@@ -100,10 +100,10 @@ func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 }
 
 func TestGenerateServiceTemplate(t *testing.T) {
-	internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
+	internalTestGenerateTemplate(t, "service", protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 }
 
-func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType, infraDir, infraSrcDir string) hackpadfs.FS {
+func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, infraSrcDir string) hackpadfs.FS {
 	verbose = true
 
 	//create in memory file system for testing
@@ -151,7 +151,7 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 	}
 
 	//prepend template name to output directories
-	schemaDir := path.Join(name, protonSchemaDir)
+	schemaDir := path.Join(name, "schema")
 	infraDir = path.Join(name, infraDir)
 	infraSrcDir = path.Join(name, infraSrcDir)
 

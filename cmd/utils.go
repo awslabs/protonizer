@@ -94,9 +94,9 @@ func sortTFOutputs(module *tfconfig.Module) []tfconfig.Output {
 }
 
 // recursively parses all templates in the FS with the given extension
-// filepaths are used as template names to support duplicate file names
+// filepaths used as template names to support duplicate file names
 func templateParseFSRecursive(templates fs.FS, ext string, funcMap template.FuncMap) (*template.Template, error) {
-	root := template.New("")
+	root := template.New("fs")
 	err := fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
 		if !d.IsDir() && strings.HasSuffix(path, ext) {
 			if err != nil {

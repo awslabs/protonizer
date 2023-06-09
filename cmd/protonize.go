@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"embed"
-	_ "embed"
 	"fmt"
 	"path"
 	"strings"
-	"text/template"
 
 	"github.com/hack-pad/hackpadfs"
 	hackpados "github.com/hack-pad/hackpadfs/os"
@@ -20,10 +17,10 @@ const (
 	protonInfrastructureDirEnv = "infrastructure"
 	protonInfrastructureDirSvc = "instance_infrastructure"
 	protonPipelineDirSvc       = "pipeline_infrastructure"
-	protonSchemaDir            = "schema"
 	protonTFSrc                = "src"
-	toolTerraform              = "terraform"
 	provisioningTypeCodeBuild  = "codebuild"
+	toolTerraform              = "terraform"
+	provisioningTypeAWSManaged = "awsmanaged"
 )
 
 var (
@@ -37,17 +34,12 @@ var (
 	flagProtonizeTemplateType               string
 	flagProtonizePublish                    bool
 	flagProtonizeTerraformRemoteStateBucket string
+	flagProtonizePublishBucket              string
 	flagProtonizeCompatibleEnvs             []string
 
 	tfEnvInfraSrcDir string
 	tfSvcInfraSrcDir string
 )
-
-//go:embed templates/*
-var templateFS embed.FS
-
-// parsed scaffold templates
-var scaffoldTemplates *template.Template
 
 // upCmd represents the up command
 var templateProtonizeCmd = &cobra.Command{
@@ -56,12 +48,20 @@ var templateProtonizeCmd = &cobra.Command{
 	Long: `Protonize converts existing IaC to Proton's format so that it can be published.
 Currently only supports Terraform using CodeBuild provisioning.`,
 	Run: doTemplateProtonize,
-	Example: `protonizer protonize \
+	Example: `
+# Convert existing Terraform into a Proton environment template
+protonizer protonize \
+  --name my_template \
+  --type environment \
+  --dir ~/my-existing-tf-module \
+  --out ~/proton/templates
+
+# Convert existing Terraform into a Proton service template and publish it
+protonizer protonize \
   --name my_template \
   --type service \
   --compatible-env env1:1 --compatible-env env2:1 \
-  --tool terraform \
-  --provisioning codebuild \
+  --provisioning codebuild --tool terraform \
   --dir ~/my-existing-tf-module \
   --out ~/proton/templates \
   --bucket my-s3-bucket \
@@ -70,10 +70,11 @@ Currently only supports Terraform using CodeBuild provisioning.`,
 
 type generateInput struct {
 	name                       string
-	templateType               protonTemplateType
+	templateType               string
 	srcDir                     string
 	srcFS                      hackpadfs.FS
 	destFS                     hackpadfs.FS
+	publishBucket              string
 	terraformRemoteStateBucket string
 	compatibleEnvironments     []string
 }
@@ -95,8 +96,8 @@ type outputData struct {
 
 type terraformManifest struct {
 	TemplateName           string
-	TerraformS3StateBucket string
 	TemplateType           string
+	TerraformS3StateBucket string
 }
 
 type terraformMain struct {
@@ -105,32 +106,37 @@ type terraformMain struct {
 }
 
 func init() {
-
-	var err error
-	scaffoldTemplates, err = templateParseFSRecursive(templateFS, ".tpl", nil)
-	handleError("error parsing go templates", err)
-
 	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeName, "name", "n", "", "The name of the template")
 	templateProtonizeCmd.MarkFlagRequired("name")
 
-	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeTemplateType, "type", "t", "environment", "Template type: environment or service")
+	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeTemplateType, "type", "t", "environment",
+		"Template type: environment or service")
 
-	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeSrcDir, "dir", "s", "", "The source directory of the template to parse")
+	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeSrcDir, "dir", "s", "",
+		"The source directory of the template to parse")
 	templateProtonizeCmd.MarkFlagRequired("dir")
 
-	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeOutDir, "out", "o", ".", "The directory to output the protonized template")
+	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeOutDir, "out", "o", ".",
+		"The directory to output the protonized template")
 
-	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeProvisoning, "provisioning", "p", provisioningTypeCodeBuild, "The provisioning mode to use")
+	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeProvisoning, "provisioning", "p",
+		provisioningTypeCodeBuild, "The provisioning mode to use")
 
-	templateProtonizeCmd.Flags().StringVar(&flagProtonizeTool, "tool", toolTerraform, "The tool to use. Currently, only Terraform is supported")
+	templateProtonizeCmd.Flags().StringVar(&flagProtonizeTool, "tool", toolTerraform,
+		"The tool to use. Currently, only Terraform is supported")
 
-	templateProtonizeCmd.Flags().BoolVar(&flagProtonizePublish, "publish", false, "Whether or not to publish the protonized template")
+	templateProtonizeCmd.Flags().BoolVar(&flagProtonizePublish, "publish", false,
+		"Whether or not to publish the protonized template")
 
-	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeTerraformRemoteStateBucket, "bucket", "b", "", "The S3 bucket to use for storing Terraform remote state")
-	templateProtonizeCmd.MarkFlagRequired("bucket")
+	templateProtonizeCmd.Flags().StringVarP(&flagProtonizePublishBucket, "publish-bucket", "b", "",
+		"The S3 bucket to use for template publishing. This is optional if not using the publish command.")
+
+	templateProtonizeCmd.Flags().StringVar(&flagProtonizeTerraformRemoteStateBucket, "terraform-remote-state-bucket", "",
+		"The S3 bucket to use for storing Terraform remote state. This is required for --provisioning codebuild and --tool terraform")
 
 	templateProtonizeCmd.Flags().StringArrayVar(&flagProtonizeCompatibleEnvs, "compatible-env", []string{},
-		"Proton environments (name:majorversion) that the service template is compatible with. You may specify any number of environments by repeating --compatible-env before each one")
+		`Proton environments (name:majorversion) that the service template is compatible with.
+You may specify any number of environments by repeating --compatible-env before each one`)
 
 	rootCmd.AddCommand(templateProtonizeCmd)
 
@@ -142,40 +148,57 @@ func init() {
 func doTemplateProtonize(cmd *cobra.Command, args []string) {
 
 	//check required args
-	if flagProtonizeTool != toolTerraform {
-		errorExit("currently the only provisioning type supported is", toolTerraform)
+
+	if !(flagProtonizeTemplateType == "environment" || flagProtonizeTemplateType == "service") {
+		errorExit(fmt.Sprintf("template type: %s is invalid. only environment and service are supported",
+			flagProtonizeTemplateType))
 	}
+
+	if flagProtonizeTemplateType == "service" && len(flagProtonizeCompatibleEnvs) == 0 {
+		errorExit("--compatible-env is required for service templates")
+	}
+
 	if flagProtonizeProvisoning != provisioningTypeCodeBuild {
 		errorExit("currently the only provisioning type supported is", provisioningTypeCodeBuild)
 	}
 
-	//create a file system rooted at output path (remove trailing "/")
-	//the generate function will write to this file system
-	osfs := hackpados.NewFS()
-	srcFS, err := osfs.Sub(flagProtonizeSrcDir[1:])
-	handleError("creating src file system", err)
-
-	outFS, err := osfs.Sub(flagProtonizeOutDir[1:])
-	handleError("creating out file system", err)
-
-	var tType protonTemplateType
-	switch flagProtonizeTemplateType {
-	case string(templateTypeEnvironment):
-		tType = templateTypeEnvironment
-	case string(templateTypeService):
-		tType = templateTypeService
-	default:
-		errorExit(fmt.Sprintf("template type: %s is invalid. only %v and %v are supported",
-			flagProtonizeTemplateType, templateTypeEnvironment, templateTypeService))
+	if flagProtonizeTool != toolTerraform {
+		errorExit("currently the only provisioning type supported is", toolTerraform)
 	}
+
+	if flagProtonizeProvisoning == "CodeBuild" && flagProtonizeTool == toolTerraform &&
+		flagProtonizeTerraformRemoteStateBucket == "" {
+		errorExit("--terraform-remote-state-bucket is required for --provisioning codebuild and --tool terraform")
+	}
+
+	//create an os file system rooted at output path
+	//the scaffold function will write to this file system
+	osfs := hackpados.NewFS()
+
+	//we will output to this file system
+	fsPath, err := osfs.FromOSPath(flagProtonizeOutDir)
+	handleError("FromOSPath", err)
+	m := "creating out file system: " + fsPath
+	debug(m)
+	outFS, err := osfs.Sub(fsPath)
+	handleError(m, err)
+
+	//we will copy the user's terraform source into this file system
+	fsPath, err = osfs.FromOSPath(flagProtonizeSrcDir)
+	handleError("FromOSPath", err)
+	m = "creating src file system: " + fsPath
+	debug(m)
+	srcFS, err := osfs.Sub(fsPath)
+	handleError(m, err)
 
 	//generate proton template
 	input := generateInput{
 		name:                       flagProtonizeName,
-		templateType:               tType,
+		templateType:               flagProtonizeTemplateType,
 		srcDir:                     flagProtonizeSrcDir,
 		srcFS:                      srcFS,
 		destFS:                     outFS,
+		publishBucket:              flagProtonizePublishBucket,
 		terraformRemoteStateBucket: flagProtonizeTerraformRemoteStateBucket,
 		compatibleEnvironments:     flagProtonizeCompatibleEnvs,
 	}
@@ -186,7 +209,7 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	fmt.Println("template source outputted to", templateDir)
 
 	if flagProtonizePublish {
-		publishTemplate(path.Join(templateDir, ProtonYamlFile))
+		publishTemplate(path.Join(templateDir, "proton.yaml"))
 	}
 
 	fmt.Println("done")
@@ -195,7 +218,6 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 // generates a proton template and returns the outputted template directory
 func generateCodeBuildTerraformTemplate(in generateInput) error {
 	debug("name =", in.name)
-	debug("srcDir =", in.srcDir)
 
 	//create datasets that gets fed into templates
 
@@ -215,32 +237,22 @@ func generateCodeBuildTerraformTemplate(in generateInput) error {
 
 	//codegen proton config
 	protonData := protonConfigData{
-		Name:                       in.name,
-		Type:                       string(in.templateType),
-		DisplayName:                in.name,
-		Description:                fmt.Sprintf("A %s template generated from %s", in.templateType, in.name),
-		TerraformRemoteStateBucket: in.terraformRemoteStateBucket,
-		CompatibleEnvironments:     in.compatibleEnvironments,
+		Name:                   in.name,
+		Type:                   string(in.templateType),
+		DisplayName:            in.name,
+		Description:            fmt.Sprintf("A %s template generated from %s", in.templateType, in.name),
+		PublishBucket:          flagProtonizePublishBucket,
+		CompatibleEnvironments: in.compatibleEnvironments,
 	}
 	protonConfig, err := yaml.Marshal(protonData)
 	handleError("marshalling proton config yaml", err)
 
-	tType := ""
-	infraDir := ""
-	switch in.templateType {
-	case templateTypeEnvironment:
-		tType = "env"
-		infraDir = path.Join(in.name, protonInfrastructureDirEnv)
-	case templateTypeService:
-		tType = "svc"
-		infraDir = path.Join(in.name, protonInfrastructureDirSvc)
-	}
-
-	schemaDir := path.Join(in.name, protonSchemaDir)
+	tType := getTemplateTypeShorthand(in.templateType)
+	infraDir := path.Join(in.name, getInfrastructureDirectory(string(in.templateType)))
 
 	contents := scaffolder.FSContents{
-		path.Join(in.name, ProtonYamlFile):          protonConfig,
-		path.Join(schemaDir, "schema.yaml"):         render("schema/schema.%s.yaml.go.tpl", vars, tType),
+		path.Join(in.name, "proton.yaml"):           protonConfig,
+		path.Join(in.name, "schema/schema.yaml"):    render("schema/schema.%s.yaml.go.tpl", vars, tType),
 		path.Join(infraDir, "manifest.yaml"):        render("infrastructure/codebuild/terraform/manifest.yaml.go.tpl", manifestData),
 		path.Join(infraDir, "main.tf"):              render("infrastructure/codebuild/terraform/main.%s.tf.go.tpl", mainData, tType),
 		path.Join(infraDir, "outputs.tf"):           render("infrastructure/codebuild/terraform/outputs.tf.go.tpl", outputs),
@@ -256,16 +268,32 @@ func generateCodeBuildTerraformTemplate(in generateInput) error {
 	}
 
 	//copy terraform src filesystem to infrastructure/src
-	outDir := path.Join(path.Join(infraDir, protonTFSrc))
+	// outDir := path.Join(path.Join(infraDir, protonTFSrc))
+	outDir := path.Join(infraDir, protonTFSrc)
 	destFS, err := hackpadfs.Sub(in.destFS, outDir)
 	handleError("creating file system", err)
-
 	m := "copying filesystem"
 	debug(m)
 	err = scaffolder.CopyFS(in.srcFS, destFS)
 	handleError(m, err)
 
 	return nil
+}
+
+// returns the name of the infrastructure directory based on the template type
+func getInfrastructureDirectory(templateType string) string {
+	if templateType == "environment" {
+		return protonInfrastructureDirEnv
+	}
+	return protonInfrastructureDirSvc
+}
+
+// returns the template type shorthand (env or svc)
+func getTemplateTypeShorthand(templateType string) string {
+	if templateType == "environment" {
+		return "env"
+	}
+	return "svc"
 }
 
 func parseTerraformSource(name, srcDir string) ([]schemaVariable, outputData) {
