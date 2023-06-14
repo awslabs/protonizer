@@ -68,6 +68,10 @@ func publishTemplate(file string) {
 		errorExit(fmt.Errorf("could not read proton.yaml: %w", err))
 	}
 
+	if protonConfig.PublishBucket == "" {
+		errorExit("The `publishBucket` key is not specified in proton.yaml.  This setting is required for publishing.")
+	}
+
 	//tar gz template
 	//assume template bundle is in the same directory as the proton.yaml file
 	dir := filepath.Dir(file)

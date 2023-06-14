@@ -19,7 +19,8 @@ var newCmd = &cobra.Command{
 	Run:   doNew,
 	Example: `
 # Create a new environment template using AWS-Managed CloudFormation
-protonizer new --name my-env-template --provisioning awsmanaged
+protonizer new --name my-env-template --provisioning awsmanaged \
+  --out ~/proton/templates
 
 # Create a new service template using AWS-Managed CloudFormation
 protonizer new --name my-template \
@@ -41,6 +42,7 @@ protonizer new \
   --type service \
   --provisioning codebuild --tool terraform \
   --terraform-remote-state-bucket my-s3-bucket \
+  --publish-bucket my-s3-bucket \
   --out ~/proton/templates \
   --compatible-env my-env-template:1
 
@@ -67,7 +69,8 @@ func init() {
 
 	newCmd.Flags().StringVarP(&flagNewTemplateType, "type", "t", "environment", "Template type: environment or service")
 
-	newCmd.Flags().StringVarP(&flagNewOutDir, "out", "o", ".", "The directory to output the protonized template")
+	newCmd.Flags().StringVar(&flagNewOutDir, "out", "o", "The directory to output the protonized template.  Full paths are required.")
+	newCmd.MarkFlagRequired("out")
 
 	newCmd.Flags().StringVarP(&flagNewProvisoning, "provisioning", "p", provisioningTypeCodeBuild, "The provisioning mode to use")
 
