@@ -24,7 +24,7 @@ func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 
 	result := internalTestGenerateTemplate(t, "environment", protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 
-	f, err := result.Open("my_template/infrastructure/main.tf")
+	f, err := result.Open("my_template/v1/infrastructure/main.tf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -39,7 +39,7 @@ func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 		t.Error("name variable should not be mapped to environment.inputs")
 	}
 
-	f, err = result.Open("my_template/schema/schema.yaml")
+	f, err = result.Open("my_template/v1/schema/schema.yaml")
 	if err != nil {
 		t.Error(err)
 	}
@@ -61,7 +61,7 @@ func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 
 	result := internalTestGenerateTemplate(t, "service", protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 
-	f, err := result.Open("my_template/instance_infrastructure/main.tf")
+	f, err := result.Open("my_template/v1/instance_infrastructure/main.tf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,7 +79,7 @@ func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 		t.Error("environment variable should not be mapped to service_instance.inputs")
 	}
 
-	f, err = result.Open("my_template/schema/schema.yaml")
+	f, err = result.Open("my_template/v1/schema/schema.yaml")
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,25 +150,11 @@ func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, i
 		t.Error(err)
 	}
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, "schema")
-	infraDir = path.Join(name, infraDir)
-	infraSrcDir = path.Join(name, infraSrcDir)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "main.tf"),
-		path.Join(infraDir, "variables.tf"),
-		path.Join(infraDir, "outputs.tf"),
-		path.Join(infraDir, "output.sh"),
-		path.Join(infraDir, "install-terraform.sh"),
-	}
+	pathsToCheck := getExpectedOutputFiles(name, templateType, "codebuild", "terraform")
 
 	//add user files
 	for file := range userFiles {
-		pathsToCheck = append(pathsToCheck, path.Join(infraSrcDir, file))
+		pathsToCheck = append(pathsToCheck, path.Join(name, "v1", infraSrcDir, file))
 	}
 
 	t.Log("pathsToCheck")

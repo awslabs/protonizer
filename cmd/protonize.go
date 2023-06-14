@@ -209,7 +209,7 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	fmt.Println("template source outputted to", templateDir)
 
 	if flagProtonizePublish {
-		publishTemplate(path.Join(templateDir, "proton.yaml"))
+		publishTemplate(path.Join(templateDir, "v1", "proton.yaml"))
 	}
 
 	fmt.Println("done")
@@ -248,11 +248,12 @@ func generateCodeBuildTerraformTemplate(in generateInput) error {
 	handleError("marshalling proton config yaml", err)
 
 	tType := getTemplateTypeShorthand(in.templateType)
-	infraDir := path.Join(in.name, getInfrastructureDirectory(string(in.templateType)))
+	root := path.Join(in.name, "v1")
+	infraDir := path.Join(root, getInfrastructureDirectory(string(in.templateType)))
 
 	contents := scaffolder.FSContents{
-		path.Join(in.name, "proton.yaml"):           protonConfig,
-		path.Join(in.name, "schema/schema.yaml"):    render("schema/schema.%s.yaml.go.tpl", vars, tType),
+		path.Join(root, "proton.yaml"):              protonConfig,
+		path.Join(root, "schema/schema.yaml"):       render("schema/schema.%s.yaml.go.tpl", vars, tType),
 		path.Join(infraDir, "manifest.yaml"):        render("infrastructure/codebuild/terraform/manifest.yaml.go.tpl", manifestData),
 		path.Join(infraDir, "main.tf"):              render("infrastructure/codebuild/terraform/main.%s.tf.go.tpl", mainData, tType),
 		path.Join(infraDir, "outputs.tf"):           render("infrastructure/codebuild/terraform/outputs.tf.go.tpl", outputs),
@@ -268,7 +269,6 @@ func generateCodeBuildTerraformTemplate(in generateInput) error {
 	}
 
 	//copy terraform src filesystem to infrastructure/src
-	// outDir := path.Join(path.Join(infraDir, protonTFSrc))
 	outDir := path.Join(infraDir, protonTFSrc)
 	destFS, err := hackpadfs.Sub(in.destFS, outDir)
 	handleError("creating file system", err)

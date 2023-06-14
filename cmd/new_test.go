@@ -34,17 +34,7 @@ func TestNewEnvironmentTemplateCloudFormation(t *testing.T) {
 		destFS,
 	)
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, "schema")
-	infraDir := path.Join(name, protonInfrastructureDirEnv)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "cloudformation.yaml"),
-	}
-
+	pathsToCheck := getExpectedOutputFiles(name, "environment", "awsmanaged", "")
 	internalCheckPaths(t, destFS, pathsToCheck)
 }
 
@@ -69,17 +59,7 @@ func TestNewServiceTemplateCloudFormation(t *testing.T) {
 		destFS,
 	)
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, "schema")
-	infraDir := path.Join(name, protonInfrastructureDirSvc)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "cloudformation.yaml"),
-	}
-
+	pathsToCheck := getExpectedOutputFiles(name, "service", "awsmanaged", "")
 	internalCheckPaths(t, destFS, pathsToCheck)
 }
 
@@ -104,21 +84,7 @@ func TestNewEnvironmentTemplateCodeBuildTerraform(t *testing.T) {
 		destFS,
 	)
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, "schema")
-	infraDir := path.Join(name, protonInfrastructureDirEnv)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "main.tf"),
-		path.Join(infraDir, "variables.tf"),
-		path.Join(infraDir, "outputs.tf"),
-		path.Join(infraDir, "output.sh"),
-		path.Join(infraDir, "install-terraform.sh"),
-	}
-
+	pathsToCheck := getExpectedOutputFiles(name, "environment", "codebuild", "terraform")
 	internalCheckPaths(t, destFS, pathsToCheck)
 }
 
@@ -143,21 +109,7 @@ func TestNewServiceTemplateCodeBuildTerraform(t *testing.T) {
 		destFS,
 	)
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, "schema")
-	infraDir := path.Join(name, protonInfrastructureDirSvc)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "main.tf"),
-		path.Join(infraDir, "variables.tf"),
-		path.Join(infraDir, "outputs.tf"),
-		path.Join(infraDir, "output.sh"),
-		path.Join(infraDir, "install-terraform.sh"),
-	}
-
+	pathsToCheck := getExpectedOutputFiles(name, "service", "codebuild", "terraform")
 	internalCheckPaths(t, destFS, pathsToCheck)
 }
 
@@ -204,4 +156,35 @@ func internalCheckPaths(t *testing.T, destFS fs.FS, pathsToCheck []string) {
 	if findings != len(pathsToCheck) {
 		t.Error(errors.New("path counts don't match. did you add/remove something in the local templates directory?"))
 	}
+}
+
+func getExpectedOutputFiles(name, templateType, provisioningMethod, tool string) []string {
+
+	iDir := protonInfrastructureDirEnv
+	if templateType == "service" {
+		iDir = protonInfrastructureDirSvc
+	}
+
+	root := path.Join(name, "v1")
+	schemaDir := path.Join(root, "schema")
+	infraDir := path.Join(root, iDir)
+
+	pathsToCheck := []string{
+		path.Join(root, "proton.yaml"),
+		path.Join(schemaDir, "schema.yaml"),
+		path.Join(infraDir, "manifest.yaml"),
+	}
+
+	if provisioningMethod == provisioningTypeAWSManaged {
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "cloudformation.yaml"))
+
+	} else if provisioningMethod == provisioningTypeCodeBuild && tool == "terraform" {
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "main.tf"))
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "variables.tf"))
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "outputs.tf"))
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "output.sh"))
+		pathsToCheck = append(pathsToCheck, path.Join(infraDir, "install-terraform.sh"))
+	}
+
+	return pathsToCheck
 }

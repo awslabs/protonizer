@@ -40,17 +40,18 @@ protonizer new \
 ```
 tree
 .
-|____v1
-| |____proton.yaml
-| |____schema
-| | |____schema.yaml
-| |____infrastructure
-| | |____outputs.tf
-| | |____main.tf
-| | |____output.sh
-| | |____manifest.yaml
-| | |____install-terraform.sh
-| | |____variables.tf
+| |____my_template
+| | |____v1
+| | | |____proton.yaml
+| | | |____schema
+| | | | |____schema.yaml
+| | | |____instance_infrastructure
+| | | | |____outputs.tf
+| | | | |____main.tf
+| | | | |____output.sh
+| | | | |____manifest.yaml
+| | | | |____install-terraform.sh
+| | | | |____variables.tf
 ```
 
 **CloudFormation**
@@ -65,16 +66,16 @@ protonizer new \
 ```
 
 ```
-cd my_template/v1
 tree
 .
-|____v1
-| |____proton.yaml
-| |____schema
-| | |____schema.yaml
-| |____infrastructure
-| | |____cloudformation.yaml
-| | |____manifest.yaml
+| |____my-template
+| | |____v1
+| | | |____proton.yaml
+| | | |____schema
+| | | | |____schema.yaml
+| | | |____infrastructure
+| | | | |____cloudformation.yaml
+| | | | |____manifest.yaml
 ```
 
 

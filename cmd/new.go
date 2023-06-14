@@ -23,7 +23,7 @@ protonizer new --name my-env-template --provisioning awsmanaged
 
 # Create a new service template using AWS-Managed CloudFormation
 protonizer new --name my-template \
-	--provisioning awsmanaged \
+  --provisioning awsmanaged \
   --type service \
   --compatible-env my-env-template:1 \
   --out ~/proton/templates
@@ -174,12 +174,13 @@ func scaffoldProton(
 	}
 
 	tType := getTemplateTypeShorthand(templateType)
-	infraDir := path.Join(name, getInfrastructureDirectory(templateType))
+	root := path.Join(name, "v1")
+	infraDir := path.Join(root, getInfrastructureDirectory(templateType))
 
 	//scaffold common files
 	contents := scaffolder.FSContents{
-		path.Join(name, "proton.yaml"):        protonConfig,
-		path.Join(name, "schema/schema.yaml"): render("schema/schema.%s.yaml.go.tpl", schemaVars, tType),
+		path.Join(root, "proton.yaml"):           protonConfig,
+		path.Join(root, "schema", "schema.yaml"): render("schema/schema.%s.yaml.go.tpl", schemaVars, tType),
 	}
 
 	//add proton template-specific content
@@ -220,7 +221,7 @@ func addAWSManagedTemplateContent(in scaffoldInputData) {
 	contents[path.Join(in.InfraDir, "manifest.yaml")] = manifest
 
 	//add cloudformation.yaml
-	cfnIac, err := fs.ReadFile(templateFS, fmt.Sprintf("templates/infrastructure/awsmanaged/cloudformation.%s.yaml", in.Shorthand))
+	cfnIac, err := fs.ReadFile(templateFS, fmt.Sprintf("templates/infrastructure/awsmanaged/cloudformation.%s.yaml.jinja", in.Shorthand))
 	handleError("reading cloudformation.yaml template", err)
 	contents[path.Join(in.InfraDir, "cloudformation.yaml")] = cfnIac
 }
