@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/hack-pad/hackpadfs"
@@ -53,8 +54,7 @@ Currently only supports Terraform using CodeBuild provisioning.`,
 protonizer protonize \
   --name my_template \
   --type environment \
-  --dir ~/my-existing-tf-module \
-  --out ~/proton/templates
+  --dir ~/my-existing-tf-module
 
 # Convert existing Terraform into a Proton service template and publish it
 protonizer protonize \
@@ -63,7 +63,6 @@ protonizer protonize \
   --compatible-env env1:1 --compatible-env env2:1 \
   --provisioning codebuild --tool terraform \
   --dir ~/my-existing-tf-module \
-  --out ~/proton/templates \
   --bucket my-s3-bucket \
   --publish`,
 }
@@ -117,7 +116,7 @@ func init() {
 	templateProtonizeCmd.MarkFlagRequired("dir")
 
 	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeOutDir, "out", "o", ".",
-		"The directory to output the protonized template")
+		"The directory to output the protonized template. Defaults to the current directory")
 
 	templateProtonizeCmd.Flags().StringVarP(&flagProtonizeProvisoning, "provisioning", "p",
 		provisioningTypeCodeBuild, "The provisioning mode to use")
@@ -176,7 +175,9 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	osfs := hackpados.NewFS()
 
 	//we will output to this file system
-	fsPath, err := osfs.FromOSPath(flagProtonizeOutDir)
+	out, err := filepath.Abs(flagProtonizeOutDir)
+	handleError("getting absolute path of out dir", err)
+	fsPath, err := osfs.FromOSPath(out)
 	handleError("FromOSPath", err)
 	m := "creating out file system: " + fsPath
 	debug(m)
@@ -184,7 +185,9 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	handleError(m, err)
 
 	//we will copy the user's terraform source into this file system
-	fsPath, err = osfs.FromOSPath(flagProtonizeSrcDir)
+	sDir, err := filepath.Abs(flagProtonizeSrcDir)
+	handleError("getting absolute path of src dir", err)
+	fsPath, err = osfs.FromOSPath(sDir)
 	handleError("FromOSPath", err)
 	m = "creating src file system: " + fsPath
 	debug(m)
@@ -195,7 +198,7 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	input := generateInput{
 		name:                       flagProtonizeName,
 		templateType:               flagProtonizeTemplateType,
-		srcDir:                     flagProtonizeSrcDir,
+		srcDir:                     sDir,
 		srcFS:                      srcFS,
 		destFS:                     outFS,
 		publishBucket:              flagProtonizePublishBucket,
@@ -205,7 +208,7 @@ func doTemplateProtonize(cmd *cobra.Command, args []string) {
 	err = generateCodeBuildTerraformTemplate(input)
 	handleError("generating template", err)
 
-	templateDir := path.Join(flagProtonizeOutDir, flagProtonizeName)
+	templateDir := path.Join(out, flagProtonizeName)
 	fmt.Println("template source outputted to", templateDir)
 
 	if flagProtonizePublish {

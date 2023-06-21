@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"path/filepath"
 
 	hackpados "github.com/hack-pad/hackpadfs/os"
 	"github.com/jritsema/scaffolder"
@@ -19,22 +20,19 @@ var newCmd = &cobra.Command{
 	Run:   doNew,
 	Example: `
 # Create a new environment template using AWS-Managed CloudFormation
-protonizer new --name my-env-template --provisioning awsmanaged \
-  --out ~/proton/templates
+protonizer new --name my-env-template --provisioning awsmanaged
 
 # Create a new service template using AWS-Managed CloudFormation
 protonizer new --name my-template \
   --provisioning awsmanaged \
   --type service \
-  --compatible-env my-env-template:1 \
-  --out ~/proton/templates
+  --compatible-env my-env-template:1
 
 # Create a new environment template using CodeBuild provisioning with Terraform
 protonizer new \
   --name my_template \
   --provisioning codebuild --tool terraform \
-  --terraform-remote-state-bucket my-s3-bucket \
-  --out ~/proton/templates
+  --terraform-remote-state-bucket my-s3-bucket
 
 # Create a new service template using CodeBuild provisioning with Terraform
 protonizer new \
@@ -43,8 +41,8 @@ protonizer new \
   --provisioning codebuild --tool terraform \
   --terraform-remote-state-bucket my-s3-bucket \
   --publish-bucket my-s3-bucket \
-  --out ~/proton/templates \
-  --compatible-env my-env-template:1
+  --compatible-env my-env-template:1 \
+  --out ~/proton/templates
 
 # If you would like to use protonizer to publish this template,
 then you can include an S3 bucket that you have write access to
@@ -69,8 +67,7 @@ func init() {
 
 	newCmd.Flags().StringVarP(&flagNewTemplateType, "type", "t", "environment", "Template type: environment or service")
 
-	newCmd.Flags().StringVar(&flagNewOutDir, "out", "o", "The directory to output the protonized template.  Full paths are required.")
-	newCmd.MarkFlagRequired("out")
+	newCmd.Flags().StringVarP(&flagNewOutDir, "out", "o", ".", "The directory to output the protonized template. Defaults to current directory.")
 
 	newCmd.Flags().StringVarP(&flagNewProvisoning, "provisioning", "p", provisioningTypeCodeBuild, "The provisioning mode to use")
 
@@ -100,11 +97,6 @@ type scaffoldInputData struct {
 	TerraformS3StateBucket string
 }
 
-type readmeData struct {
-	Name string
-	Type string
-}
-
 func doNew(cmd *cobra.Command, args []string) {
 
 	//check required args
@@ -124,8 +116,10 @@ func doNew(cmd *cobra.Command, args []string) {
 
 	//create a file system rooted at output path
 	//the scaffold function will write to this file system
+	out, err := filepath.Abs(flagNewOutDir)
+	handleError("getting absolute path of out dir", err)
 	osfs := hackpados.NewFS()
-	fsPath, err := osfs.FromOSPath(flagNewOutDir)
+	fsPath, err := osfs.FromOSPath(out)
 	m := "creating out file system: " + fsPath
 	debug(m)
 	handleError("FromOSPath", err)
@@ -143,7 +137,7 @@ func doNew(cmd *cobra.Command, args []string) {
 		outFS,
 	)
 
-	fmt.Println("template source outputted to", path.Join(flagNewOutDir, flagNewTemplateName))
+	fmt.Println("template source outputted to", path.Join(out, flagNewTemplateName))
 	fmt.Println("done")
 }
 
