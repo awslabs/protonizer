@@ -121,7 +121,8 @@ func publishTemplate(file string) {
 	fmt.Printf("published %s:%s.%s \n", protonConfig.Name, majorVersion, minorVersion)
 
 	//output console url of published template
-	fmt.Printf("https://%s.console.aws.amazon.com/proton/home#/templates/%vs/detail/%s\n", os.Getenv("AWS_REGION"), protonConfig.Type, protonConfig.Name)
+	fmt.Printf("https://%s.console.aws.amazon.com/proton/home#/templates/%vs/detail/%s\n",
+		cfg.Region, protonConfig.Type, protonConfig.Name)
 }
 
 func publishEnvironmentTemplate(cfg aws.Config, protonConfig *protonConfigData, s3Key string, ctx context.Context) (string, string) {
