@@ -94,9 +94,15 @@ type scaffoldInputData struct {
 	Name                   string
 	Type                   string
 	Shorthand              string
+	RootDir                string
 	InfraDir               string
 	Vars                   []schemaVariable
 	TerraformS3StateBucket string
+}
+
+type readmeData struct {
+	Name string
+	Type string
 }
 
 func doNew(cmd *cobra.Command, args []string) {
@@ -192,6 +198,7 @@ func scaffoldProton(
 		Name:                   name,
 		Type:                   templateType,
 		Shorthand:              getTemplateTypeShorthand(templateType),
+		RootDir:                root,
 		InfraDir:               infraDir,
 		Vars:                   schemaVars,
 		TerraformS3StateBucket: terraformRemoteStateBucket,
@@ -214,27 +221,20 @@ func scaffoldProton(
 }
 
 func addAWSManagedTemplateContent(in scaffoldInputData) {
-	contents := *in.Contents
 
-	//write these go templates as is
+	addContent(in.Contents, in.RootDir, "README.md",
+		"readme/%s.cfn.md", in.Shorthand)
 
-	//add manifest.yaml
-	manifest, err := fs.ReadFile(templateFS, "templates/infrastructure/awsmanaged/manifest.yaml")
-	handleError("reading manifest.yaml template", err)
-	contents[path.Join(in.InfraDir, "manifest.yaml")] = manifest
+	addContent(in.Contents, in.InfraDir, "manifest.yaml",
+		"infrastructure/awsmanaged/manifest.yaml")
 
-	//add cloudformation.yaml
-	cfnIac, err := fs.ReadFile(templateFS, fmt.Sprintf("templates/infrastructure/awsmanaged/cloudformation.%s.yaml.jinja", in.Shorthand))
-	handleError("reading cloudformation.yaml template", err)
-	contents[path.Join(in.InfraDir, "cloudformation.yaml")] = cfnIac
+	addContent(in.Contents, in.InfraDir, "cloudformation.yaml",
+		"infrastructure/awsmanaged/cloudformation.%s.yaml.jinja", in.Shorthand)
 }
 
 func addCBPTerraformTemplateContent(in scaffoldInputData) {
 	contents := *in.Contents
 
-	//render go templates
-
-	//add manifest.yaml
 	manifestData := terraformManifest{
 		TemplateType:           in.Type,
 		TemplateName:           in.Name,
@@ -243,29 +243,27 @@ func addCBPTerraformTemplateContent(in scaffoldInputData) {
 	manifest := render("infrastructure/codebuild/terraform/manifest.yaml.go.tpl", manifestData)
 	contents[path.Join(in.InfraDir, "manifest.yaml")] = manifest
 
-	//add main.tf
 	mainData := terraformMain{
 		ModuleName: in.Name,
 		Variables:  in.Vars,
 	}
 	contents[path.Join(in.InfraDir, "main.tf")] =
-		render("infrastructure/codebuild/terraform/main.%s.tf.new.go.tpl", mainData.Variables[0], in.Shorthand)
+		render("infrastructure/codebuild/terraform/main.%s.tf.new.go.tpl",
+			mainData.Variables[0], in.Shorthand)
 
-	//add outputs.tf
-	outputs := outputData{
-		ModuleName: in.Name,
-	}
 	contents[path.Join(in.InfraDir, "outputs.tf")] =
-		render("infrastructure/codebuild/terraform/outputs.tf.go.tpl", outputs)
+		render("infrastructure/codebuild/terraform/outputs.tf.go.tpl",
+			outputData{ModuleName: in.Name})
 
-	//write these go templates as is
+	addContent(in.Contents, in.RootDir, "README.md",
+		"readme/%s.tf.md", in.Shorthand)
 
-	contents[path.Join(in.InfraDir, "variables.tf")] =
-		readTemplateFS("infrastructure/codebuild/terraform/variables.%s.tf", in.Shorthand)
+	addContent(in.Contents, in.InfraDir, "variables.tf",
+		"infrastructure/codebuild/terraform/variables.%s.tf", in.Shorthand)
 
-	contents[path.Join(in.InfraDir, "output.sh")] =
-		readTemplateFS("infrastructure/codebuild/terraform/output.sh")
+	addContent(in.Contents, in.InfraDir, "output.sh",
+		"infrastructure/codebuild/terraform/output.sh")
 
-	contents[path.Join(in.InfraDir, "install-terraform.sh")] =
-		readTemplateFS("infrastructure/codebuild/terraform/install-terraform.sh")
+	addContent(in.Contents, in.InfraDir, "install-terraform.sh",
+		"infrastructure/codebuild/terraform/install-terraform.sh")
 }

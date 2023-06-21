@@ -119,14 +119,18 @@ func internalCheckPaths(t *testing.T, destFS fs.FS, pathsToCheck []string) {
 	t.Log("pathsToCheck")
 	t.Log(pathsToCheck)
 
-	findings := 0
+	found := 0
+	findings := []string{}
 	err := hackpadfs.WalkDir(destFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		if !d.IsDir() {
+			findings = append(findings, path)
+		}
 		t.Log("looking for path in destFS", path)
 		if SliceContains(&pathsToCheck, path, false) {
-			findings++
+			found++
 			t.Log("found", path)
 		}
 
@@ -150,10 +154,26 @@ func internalCheckPaths(t *testing.T, destFS fs.FS, pathsToCheck []string) {
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log("expected paths:", len(pathsToCheck))
-	t.Log("actual paths:", findings)
 
-	if findings != len(pathsToCheck) {
+	t.Log("expected paths:", len(pathsToCheck))
+	t.Log("actual paths:", len(findings))
+
+	if len(findings) != len(pathsToCheck) {
+		t.Log()
+		//show expected files that were not found
+		for _, f := range pathsToCheck {
+			if !SliceContains(&findings, f, false) {
+				t.Log("missing", f)
+			}
+		}
+		t.Log()
+		//show found files that were not expected
+		for _, f := range findings {
+			if !SliceContains(&pathsToCheck, f, false) {
+				t.Log("not expecting", f)
+			}
+		}
+		t.Log()
 		t.Error(errors.New("path counts don't match. did you add/remove something in the local templates directory?"))
 	}
 }
@@ -171,6 +191,7 @@ func getExpectedOutputFiles(name, templateType, provisioningMethod, tool string)
 
 	pathsToCheck := []string{
 		path.Join(root, "proton.yaml"),
+		path.Join(root, "README.md"),
 		path.Join(schemaDir, "schema.yaml"),
 		path.Join(infraDir, "manifest.yaml"),
 	}

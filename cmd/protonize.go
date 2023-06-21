@@ -252,6 +252,7 @@ func generateCodeBuildTerraformTemplate(in generateInput) error {
 	infraDir := path.Join(root, getInfrastructureDirectory(string(in.templateType)))
 
 	contents := scaffolder.FSContents{
+		path.Join(root, "README.md"):                readTemplateFS("readme/%s.tf.md", tType),
 		path.Join(root, "proton.yaml"):              protonConfig,
 		path.Join(root, "schema/schema.yaml"):       render("schema/schema.%s.yaml.go.tpl", vars, tType),
 		path.Join(infraDir, "manifest.yaml"):        render("infrastructure/codebuild/terraform/manifest.yaml.go.tpl", manifestData),

@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	"github.com/jritsema/scaffolder"
 )
 
 // handle errors
@@ -135,4 +136,10 @@ func render(template string, data interface{}, a ...interface{}) []byte {
 		errorExit("error executing go template:", err)
 	}
 	return buf.Bytes()
+}
+
+// adds template content to the contents map
+func addContent(contents *scaffolder.FSContents, dir, file, template string, args ...interface{}) {
+	c := *contents
+	c[path.Join(dir, file)] = readTemplateFS(template, args...)
 }

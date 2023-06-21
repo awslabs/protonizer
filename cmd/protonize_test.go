@@ -104,7 +104,6 @@ func TestGenerateServiceTemplate(t *testing.T) {
 }
 
 func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, infraSrcDir string) hackpadfs.FS {
-	verbose = true
 
 	//create in memory file system for testing
 	srcFS, err := mem.NewFS()
@@ -160,14 +159,18 @@ func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, i
 	t.Log("pathsToCheck")
 	t.Log(pathsToCheck)
 
-	findings := 0
+	found := 0
+	findings := []string{}
 	err = hackpadfs.WalkDir(destFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		if !d.IsDir() {
+			findings = append(findings, path)
+		}
 		t.Log("looking for path in destFS", path)
 		if SliceContains(&pathsToCheck, path, false) {
-			findings++
+			found++
 			t.Log("found", path)
 		}
 
@@ -191,9 +194,24 @@ func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, i
 		t.Error(err)
 	}
 	t.Log("expected paths:", len(pathsToCheck))
-	t.Log("actual paths:", findings)
+	t.Log("actual paths:", len(findings))
 
-	if findings != len(pathsToCheck) {
+	if len(findings) != len(pathsToCheck) {
+		t.Log()
+		//show expected files that were not found
+		for _, f := range pathsToCheck {
+			if !SliceContains(&findings, f, false) {
+				t.Log("missing", f)
+			}
+		}
+		t.Log()
+		//show found files that were not expected
+		for _, f := range findings {
+			if !SliceContains(&pathsToCheck, f, false) {
+				t.Log("not expecting", f)
+			}
+		}
+		t.Log()
 		t.Error(errors.New("path counts don't match. did you add/remove something in the local templates directory?"))
 	}
 
