@@ -69,7 +69,16 @@ func publishTemplate(file string) {
 	}
 
 	if protonConfig.PublishBucket == "" {
-		errorExit("The `publishBucket` key is not specified in proton.yaml.  This setting is required for publishing.")
+		errorExit("The `publishBucket` key is not specified in proton.yaml. This setting is required for publishing.")
+	}
+
+	if region := os.Getenv("AWS_REGION"); region == "" {
+		errorExit(`Please specify the AWS region by setting the "AWS_REGION" environment variable.
+
+For example:
+export AWS_REGION=us-east-1
+OR
+AWS_REGION=us-east-1 protonizer publish`)
 	}
 
 	//tar gz template
