@@ -16,15 +16,15 @@ import (
 )
 
 func TestGenerateEnvironmentTemplate(t *testing.T) {
-	internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
+	internalTestGenerateTemplate(t, "environment", protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 }
 
 // tests that reserved variables are mapped properly
 func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 
-	result := internalTestGenerateTemplate(t, templateTypeEnvironment, protonInfrastructureDirEnv, tfEnvInfraSrcDir)
+	result := internalTestGenerateTemplate(t, "environment", protonInfrastructureDirEnv, tfEnvInfraSrcDir)
 
-	f, err := result.Open("my_template/infrastructure/main.tf")
+	f, err := result.Open("my_template/v1/infrastructure/main.tf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -39,7 +39,7 @@ func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 		t.Error("name variable should not be mapped to environment.inputs")
 	}
 
-	f, err = result.Open("my_template/schema/schema.yaml")
+	f, err = result.Open("my_template/v1/schema/schema.yaml")
 	if err != nil {
 		t.Error(err)
 	}
@@ -59,9 +59,9 @@ func TestGenerateEnvironmentTemplate_ReservedVar(t *testing.T) {
 // tests that reserved variables are mapped properly
 func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 
-	result := internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
+	result := internalTestGenerateTemplate(t, "service", protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 
-	f, err := result.Open("my_template/instance_infrastructure/main.tf")
+	f, err := result.Open("my_template/v1/instance_infrastructure/main.tf")
 	if err != nil {
 		t.Error(err)
 	}
@@ -79,7 +79,7 @@ func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 		t.Error("environment variable should not be mapped to service_instance.inputs")
 	}
 
-	f, err = result.Open("my_template/schema/schema.yaml")
+	f, err = result.Open("my_template/v1/schema/schema.yaml")
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,11 +100,10 @@ func TestGenerateServiceTemplate_ReservedVar(t *testing.T) {
 }
 
 func TestGenerateServiceTemplate(t *testing.T) {
-	internalTestGenerateTemplate(t, templateTypeService, protonInfrastructureDirSvc, tfSvcInfraSrcDir)
+	internalTestGenerateTemplate(t, "service", protonInfrastructureDirSvc, tfSvcInfraSrcDir)
 }
 
-func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType, infraDir, infraSrcDir string) hackpadfs.FS {
-	verbose = true
+func internalTestGenerateTemplate(t *testing.T, templateType string, infraDir, infraSrcDir string) hackpadfs.FS {
 
 	//create in memory file system for testing
 	srcFS, err := mem.NewFS()
@@ -140,7 +139,7 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 		srcFS:        srcFS,
 		destFS:       destFS,
 	}
-	err = generateTemplate(input)
+	err = generateCodeBuildTerraformTemplate(input)
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,38 +149,28 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 		t.Error(err)
 	}
 
-	//prepend template name to output directories
-	schemaDir := path.Join(name, protonSchemaDir)
-	infraDir = path.Join(name, infraDir)
-	infraSrcDir = path.Join(name, infraSrcDir)
-
-	pathsToCheck := []string{
-		path.Join(name, "proton.yaml"),
-		path.Join(schemaDir, "schema.yaml"),
-		path.Join(infraDir, "manifest.yaml"),
-		path.Join(infraDir, "main.tf"),
-		path.Join(infraDir, "variables.tf"),
-		path.Join(infraDir, "outputs.tf"),
-		path.Join(infraDir, "output.sh"),
-		path.Join(infraDir, "install-terraform.sh"),
-	}
+	pathsToCheck := getExpectedOutputFiles(name, templateType, "codebuild", "terraform")
 
 	//add user files
 	for file := range userFiles {
-		pathsToCheck = append(pathsToCheck, path.Join(infraSrcDir, file))
+		pathsToCheck = append(pathsToCheck, path.Join(name, "v1", infraSrcDir, file))
 	}
 
 	t.Log("pathsToCheck")
 	t.Log(pathsToCheck)
 
-	findings := 0
+	found := 0
+	findings := []string{}
 	err = hackpadfs.WalkDir(destFS, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		if !d.IsDir() {
+			findings = append(findings, path)
+		}
 		t.Log("looking for path in destFS", path)
 		if SliceContains(&pathsToCheck, path, false) {
-			findings++
+			found++
 			t.Log("found", path)
 		}
 
@@ -205,9 +194,24 @@ func internalTestGenerateTemplate(t *testing.T, templateType protonTemplateType,
 		t.Error(err)
 	}
 	t.Log("expected paths:", len(pathsToCheck))
-	t.Log("actual paths:", findings)
+	t.Log("actual paths:", len(findings))
 
-	if findings != len(pathsToCheck) {
+	if len(findings) != len(pathsToCheck) {
+		t.Log()
+		//show expected files that were not found
+		for _, f := range pathsToCheck {
+			if !SliceContains(&findings, f, false) {
+				t.Log("missing", f)
+			}
+		}
+		t.Log()
+		//show found files that were not expected
+		for _, f := range findings {
+			if !SliceContains(&pathsToCheck, f, false) {
+				t.Log("not expecting", f)
+			}
+		}
+		t.Log()
 		t.Error(errors.New("path counts don't match. did you add/remove something in the local templates directory?"))
 	}
 

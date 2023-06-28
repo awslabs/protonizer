@@ -1,13 +1,18 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
+	"path"
 	"sort"
 	"strings"
+	"text/template"
 
 	"github.com/hashicorp/terraform-config-inspect/tfconfig"
+	"github.com/jritsema/scaffolder"
 )
 
 // handle errors
@@ -87,4 +92,54 @@ func sortTFOutputs(module *tfconfig.Module) []tfconfig.Output {
 		return result[i].Name < result[j].Name
 	})
 	return result
+}
+
+// recursively parses all templates in the FS with the given extension
+// filepaths used as template names to support duplicate file names
+func templateParseFSRecursive(templates fs.FS, ext string, funcMap template.FuncMap) (*template.Template, error) {
+	root := template.New("fs")
+	err := fs.WalkDir(templates, "templates", func(path string, d fs.DirEntry, err error) error {
+		if !d.IsDir() && strings.HasSuffix(path, ext) {
+			if err != nil {
+				return err
+			}
+			b, err := fs.ReadFile(templates, path)
+			if err != nil {
+				return err
+			}
+			//name the template based on the file path (excluding the root)
+			parts := strings.Split(path, string(os.PathSeparator))
+			name := strings.Join(parts[1:], string(os.PathSeparator))
+			t := root.New(name).Funcs(funcMap)
+			_, err = t.Parse(string(b))
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return root, err
+}
+
+// reads a template
+func readTemplateFS(f string, a ...interface{}) []byte {
+	result, err := fs.ReadFile(templateFS, path.Join("templates", fmt.Sprintf(f, a...)))
+	handleError("reading template file", err)
+	return result
+}
+
+// renders data into a template returning the result
+func render(template string, data interface{}, a ...interface{}) []byte {
+	var buf bytes.Buffer
+	err := scaffoldTemplates.ExecuteTemplate(&buf, fmt.Sprintf(template, a...), data)
+	if err != nil {
+		errorExit("error executing go template:", err)
+	}
+	return buf.Bytes()
+}
+
+// adds template content to the contents map
+func addContent(contents *scaffolder.FSContents, dir, file, template string, args ...interface{}) {
+	c := *contents
+	c[path.Join(dir, file)] = readTemplateFS(template, args...)
 }

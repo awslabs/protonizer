@@ -1,24 +1,22 @@
-/*
-Copyright © 2022 John Ritsema
-*/
 package cmd
 
 import (
+	"embed"
+	"log"
 	"os"
+	"text/template"
 
 	"github.com/spf13/cobra"
 )
 
-// strongly-typed template type (environment or service)
-type protonTemplateType string
-
-const (
-	templateTypeEnvironment protonTemplateType = "environment"
-	templateTypeService     protonTemplateType = "service"
-)
+//go:embed templates/*
+var templateFS embed.FS
 
 // verbose logging enabled
 var verbose = false
+
+// parsed scaffold templates
+var scaffoldTemplates *template.Template
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -38,5 +36,13 @@ func Execute(version string) {
 }
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+
+	//parse go templates
+	debug("parsing go templates")
+	var err error
+	scaffoldTemplates, err = templateParseFSRecursive(templateFS, ".tpl", nil)
+	handleError("error parsing go templates", err)
+	debugFmt("defined templates: %v", scaffoldTemplates.DefinedTemplates())
 }
